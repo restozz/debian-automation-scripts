@@ -303,8 +303,8 @@ load_scripts() {
 
         if [ -n "$GITHUB_SCRIPTS" ]; then
             for script_name in $GITHUB_SCRIPTS; do
-                # Ignorer les scripts déjà présents localement
-                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ] && [ "$script_name" != "install_proxmox_agent.sh" ]; then
+                # Ignorer les scripts déjà présents localement et launcher.sh lui-même
+                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ] && [ "$script_name" != "install_proxmox_agent.sh" ] && [ "$script_name" != "launcher.sh" ]; then
                     local desc=$(get_script_description "$script_name")
                     SCRIPT_LIST[$index]="github:$script_name"
                     DESC_LIST[$index]="$desc (GitHub)"
