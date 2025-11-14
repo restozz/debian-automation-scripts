@@ -62,8 +62,9 @@ debian-automation-scripts/
 │   └── On-demand script download & execution
 │
 └── Automation Scripts:
-    ├── setup_debian_vm.sh    # Post-install config (551 lines)
-    └── install_docker.sh     # Docker installation (73 lines)
+    ├── setup_debian_vm.sh      # Post-install config (~560 lines)
+    ├── install_docker.sh       # Docker installation (~90 lines)
+    └── install_proxmox_agent.sh # Proxmox Agent (~200 lines)
 
 Runtime Generated:
 ├── .launcher_config          # Generated: Stores GitHub repo + OS info
@@ -77,6 +78,7 @@ Runtime Generated:
 | `launcher.sh` | ~400 | Main hub | `setup_github_repo()`, `download_script()`, `detect_os()` |
 | `setup_debian_vm.sh` | ~560 | SSH hardening | User setup, SSH config, UFW, Fail2Ban |
 | `install_docker.sh` | ~90 | Docker setup | Install Docker CE + Compose with OS detection |
+| `install_proxmox_agent.sh` | ~200 | Proxmox Agent | Install QEMU Guest Agent (multi-distro) |
 | `BONNES_PRATIQUES.md` | - | Guidelines | Best practices for script development |
 
 ---
@@ -205,6 +207,39 @@ Fail2Ban: maxretry=6, bantime=3600  # Intrusion prevention
 5. Verify with `docker run --rm hello-world`
 
 **Silent Mode**: Most output redirected to `/dev/null` for clean display
+
+### 4. install_proxmox_agent.sh (Proxmox Guest Agent)
+
+**Purpose**: Install QEMU Guest Agent for Proxmox VE integration
+
+**Multi-distribution support**:
+- Debian, Ubuntu, Linux Mint, Pop!_OS
+- RHEL, CentOS, Rocky Linux, AlmaLinux, Oracle Linux
+- Fedora
+- openSUSE (Leap, Tumbleweed), SLES
+- Arch Linux, Manjaro
+- Alpine Linux
+
+**Process**:
+1. Verify distribution compatibility
+2. Install `qemu-guest-agent` package (method varies by distro)
+3. Enable and start the service
+4. Verify service status
+
+**Adaptive Installation**:
+```bash
+# Debian/Ubuntu: apt-get
+# RHEL/CentOS: yum/dnf
+# Fedora: dnf
+# openSUSE: zypper
+# Arch: pacman
+# Alpine: apk
+```
+
+**Post-installation** (Proxmox configuration):
+- Enable QEMU Guest Agent in VM Options (Web UI)
+- Or via CLI: `qm set <VMID> --agent 1`
+- Reboot VM required
 
 ---
 

@@ -270,6 +270,13 @@ load_scripts() {
         ((index++))
     fi
 
+    # Script 3: Installation Proxmox Agent (toujours présent en local)
+    if [ -f "$LAUNCHER_DIR/install_proxmox_agent.sh" ]; then
+        SCRIPTS[$index]="local:install_proxmox_agent.sh"
+        DESCRIPTIONS[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
+        ((index++))
+    fi
+
     # Charger les scripts depuis GitHub
     if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_REPO_NAME" ]; then
         list_github_scripts

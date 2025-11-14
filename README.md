@@ -6,6 +6,7 @@ Scripts d'automatisation système pour Debian - Compatible avec Script Launcher 
 
 - **setup_debian_vm.sh** - Configuration post-installation Debian 13 (SSH, UFW, Fail2Ban)
 - **install_docker.sh** - Installation complète de Docker et Docker Compose
+- **install_proxmox_agent.sh** - Installation QEMU Guest Agent pour Proxmox VE
 
 ## 🚀 Utilisation
 
