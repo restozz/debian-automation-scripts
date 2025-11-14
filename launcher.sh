@@ -251,30 +251,35 @@ get_script_description() {
     echo "$desc"
 }
 
+# Variables globales pour les scripts
+declare -a SCRIPT_LIST
+declare -a DESC_LIST
+SCRIPT_COUNT=0
+
 # Fonction pour charger les scripts disponibles
 load_scripts() {
-    declare -a SCRIPTS
-    declare -a DESCRIPTIONS
+    SCRIPT_LIST=()
+    DESC_LIST=()
     local index=0
 
     # Script 1: Configuration Debian (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/setup_debian_vm.sh" ]; then
-        SCRIPTS[$index]="local:setup_debian_vm.sh"
-        DESCRIPTIONS[$index]="Configuration post-installation Debian 13 (Local)"
+        SCRIPT_LIST[$index]="local:setup_debian_vm.sh"
+        DESC_LIST[$index]="Configuration post-installation Debian 13 (Local)"
         ((index++))
     fi
 
     # Script 2: Installation Docker (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/install_docker.sh" ]; then
-        SCRIPTS[$index]="local:install_docker.sh"
-        DESCRIPTIONS[$index]="Installation complète de Docker et Docker Compose (Local)"
+        SCRIPT_LIST[$index]="local:install_docker.sh"
+        DESC_LIST[$index]="Installation complète de Docker et Docker Compose (Local)"
         ((index++))
     fi
 
     # Script 3: Installation Proxmox Agent (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/install_proxmox_agent.sh" ]; then
-        SCRIPTS[$index]="local:install_proxmox_agent.sh"
-        DESCRIPTIONS[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
+        SCRIPT_LIST[$index]="local:install_proxmox_agent.sh"
+        DESC_LIST[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
         ((index++))
     fi
 
@@ -287,18 +292,15 @@ load_scripts() {
                 # Ignorer les scripts déjà présents localement
                 if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ] && [ "$script_name" != "install_proxmox_agent.sh" ]; then
                     local desc=$(get_script_description "$script_name")
-                    SCRIPTS[$index]="github:$script_name"
-                    DESCRIPTIONS[$index]="$desc (GitHub)"
+                    SCRIPT_LIST[$index]="github:$script_name"
+                    DESC_LIST[$index]="$desc (GitHub)"
                     ((index++))
                 fi
             done
         fi
     fi
 
-    # Retourner les arrays
-    export SCRIPT_LIST=("${SCRIPTS[@]}")
-    export DESC_LIST=("${DESCRIPTIONS[@]}")
-    export SCRIPT_COUNT=${#SCRIPTS[@]}
+    SCRIPT_COUNT=${#SCRIPT_LIST[@]}
 }
 
 # Construire le menu whiptail
