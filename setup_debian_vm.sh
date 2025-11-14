@@ -77,6 +77,20 @@ cleanup() {
 trap 'handle_error ${LINENO}' ERR
 trap cleanup EXIT
 
+# Récupérer les variables OS du launcher (si disponibles)
+if [ -z "$OS_ID" ]; then
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        OS_ID="$ID"
+        OS_VERSION="${VERSION_ID:-unknown}"
+        OS_CODENAME="${VERSION_CODENAME:-unknown}"
+        OS_PRETTY_NAME="${PRETTY_NAME:-unknown}"
+    else
+        print_error "Impossible de détecter le système d'exploitation"
+        exit 1
+    fi
+fi
+
 # Vérification des privilèges root
 print_debug "Vérification des privilèges root (EUID: $EUID)"
 if [[ $EUID -ne 0 ]]; then
@@ -85,6 +99,13 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 print_debug "Date: $(date), Utilisateur: $SUDO_USER, Système: $(uname -a)"
+print_debug "OS: $OS_ID $OS_VERSION ($OS_CODENAME) - $OS_PRETTY_NAME"
+
+# Vérifier la compatibilité (optionnel, pour l'instant on supporte principalement Debian)
+if [[ "$OS_ID" != "debian" ]] && [[ "$OS_ID" != "ubuntu" ]]; then
+    print_warning "Ce script est optimisé pour Debian/Ubuntu. OS détecté: $OS_ID"
+    print_warning "Certaines commandes peuvent nécessiter des ajustements"
+fi
 
 # Clear de l'écran pour un affichage propre
 clear

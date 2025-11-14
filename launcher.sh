@@ -15,6 +15,13 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Fonctions d'affichage
+print_message() { echo -e "${BLUE}[→]${NC} $1"; }
+print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
+print_error() { echo -e "${RED}[✗]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[⚠]${NC} $1"; }
+print_debug() { [ "${DEBUG:-0}" = "1" ] && echo -e "${BLUE}[DEBUG]${NC} $1" || true; }
+
 # Répertoires et fichiers
 LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMP_DIR="$LAUNCHER_DIR/.temp_scripts"
@@ -45,6 +52,25 @@ check_curl() {
     fi
 }
 
+# Détecter le système d'exploitation
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        OS_ID="$ID"
+        OS_VERSION="${VERSION_ID:-unknown}"
+        OS_CODENAME="${VERSION_CODENAME:-unknown}"
+        OS_PRETTY_NAME="${PRETTY_NAME:-unknown}"
+
+        print_debug "OS détecté: $OS_PRETTY_NAME (ID: $OS_ID, Version: $OS_VERSION, Codename: $OS_CODENAME)"
+    else
+        OS_ID="unknown"
+        OS_VERSION="unknown"
+        OS_CODENAME="unknown"
+        OS_PRETTY_NAME="unknown"
+        print_warning "Impossible de détecter le système d'exploitation"
+    fi
+}
+
 # Charger la configuration
 load_config() {
     if [ -f "$CONFIG_FILE" ]; then
@@ -55,11 +81,20 @@ load_config() {
 # Sauvegarder la configuration
 save_config() {
     cat > "$CONFIG_FILE" << EOF
+# Configuration GitHub
 GITHUB_REPO="$GITHUB_REPO"
 GITHUB_USER="$GITHUB_USER"
 GITHUB_REPO_NAME="$GITHUB_REPO_NAME"
 GITHUB_BRANCH="$GITHUB_BRANCH"
 GITHUB_TOKEN="$GITHUB_TOKEN"
+
+# Détection du système
+OS_ID="$OS_ID"
+OS_VERSION="$OS_VERSION"
+OS_CODENAME="$OS_CODENAME"
+OS_PRETTY_NAME="$OS_PRETTY_NAME"
+
+# Métadonnées
 LAST_UPDATE=$(date +%s)
 EOF
     # Sécuriser le fichier de config (contient potentiellement un token)
@@ -318,8 +353,13 @@ execute_script() {
 
     clear
     echo -e "${BLUE}[→]${NC} Exécution: ${DESC_LIST[$script_index]}"
+    echo -e "${BLUE}[→]${NC} Système: $OS_PRETTY_NAME"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
+
+    # Exporter les variables d'environnement pour le script
+    export OS_ID OS_VERSION OS_CODENAME OS_PRETTY_NAME
+    export LAUNCHER_DIR
 
     bash "$script_path"
 
@@ -339,6 +379,14 @@ main() {
     check_whiptail
     check_curl
     load_config
+
+    # Détecter le système d'exploitation
+    detect_os
+
+    # Sauvegarder la configuration avec les informations OS
+    if [ -n "$OS_ID" ] && [ "$OS_ID" != "unknown" ]; then
+        save_config
+    fi
 
     # Vérifier si le dépôt est configuré au premier lancement
     if [ -z "$GITHUB_REPO" ]; then

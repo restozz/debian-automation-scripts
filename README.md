@@ -53,6 +53,17 @@ Le launcher télécharge automatiquement les scripts depuis GitHub **uniquement 
 - ✅ Scripts toujours à jour
 - ✅ Économie d'espace disque
 - ✅ **Support des dépôts privés** avec authentification automatique
+- ✅ **Détection automatique de l'OS** (Debian, Ubuntu) avec variables exportées
+
+### 🖥️ Détection automatique du système
+
+Le launcher détecte automatiquement votre système d'exploitation et expose ces informations à tous les scripts :
+
+- **OS_ID** : debian, ubuntu, etc.
+- **OS_VERSION** : 13, 12, 24.04, etc.
+- **OS_CODENAME** : trixie, bookworm, noble, etc.
+
+Les scripts s'adaptent automatiquement à votre distribution !
 
 ### 🔒 Dépôts privés
 
@@ -64,6 +75,13 @@ Le launcher détecte automatiquement si votre dépôt est privé et vous demande
    - Permissions : **repo** (full control)
 2. Entrer le token dans le launcher
 3. Le token est stocké en sécurité (permissions 600)
+
+### 📝 Créer vos propres scripts
+
+Consultez **BONNES_PRATIQUES.md** pour :
+- Utiliser les variables OS dans vos scripts
+- Standards de code
+- Checklist avant commit
 
 ## 👤 Auteur
 

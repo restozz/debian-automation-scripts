@@ -53,10 +53,12 @@ debian-automation-scripts/
 ├── INSTRUCTIONS.md            # Quick deployment guide
 ├── SETUP_GUIDE.md            # Detailed GitHub setup instructions
 ├── CLAUDE.md                 # This file - AI assistant guide
+├── BONNES_PRATIQUES.md       # Best practices for script development
 │
-├── launcher.sh               # Main launcher hub (322 lines)
+├── launcher.sh               # Main launcher hub (~400 lines)
 │   ├── Menu system (whiptail)
 │   ├── GitHub API integration
+│   ├── OS detection system
 │   └── On-demand script download & execution
 │
 └── Automation Scripts:
@@ -64,7 +66,7 @@ debian-automation-scripts/
     └── install_docker.sh     # Docker installation (73 lines)
 
 Runtime Generated:
-├── .launcher_config          # Generated: Stores GitHub repo configuration
+├── .launcher_config          # Generated: Stores GitHub repo + OS info
 └── .temp_scripts/            # Generated: Temporary folder for downloaded scripts
 ```
 
@@ -72,9 +74,10 @@ Runtime Generated:
 
 | File | Lines | Purpose | Key Functions |
 |------|-------|---------|---------------|
-| `launcher.sh` | 322 | Main hub | `setup_github_repo()`, `download_script()`, `list_github_scripts()` |
-| `setup_debian_vm.sh` | 551 | SSH hardening | User setup, SSH config, UFW, Fail2Ban |
-| `install_docker.sh` | 73 | Docker setup | Install Docker CE + Compose |
+| `launcher.sh` | ~400 | Main hub | `setup_github_repo()`, `download_script()`, `detect_os()` |
+| `setup_debian_vm.sh` | ~560 | SSH hardening | User setup, SSH config, UFW, Fail2Ban |
+| `install_docker.sh` | ~90 | Docker setup | Install Docker CE + Compose with OS detection |
+| `BONNES_PRATIQUES.md` | - | Guidelines | Best practices for script development |
 
 ---
 
@@ -92,8 +95,25 @@ TEMP_DIR="$LAUNCHER_DIR/.temp_scripts"  # Temporary download location
 CONFIG_FILE="$LAUNCHER_DIR/.launcher_config"
 
 # Main workflow
-check_root() → check_curl() → load_config() → main_loop()
+check_root() → check_curl() → load_config() → detect_os() → main_loop()
 ```
+
+**Détection du système d'exploitation**:
+
+Le launcher détecte automatiquement le système au démarrage et expose ces variables à tous les scripts :
+
+```bash
+OS_ID           # Identifiant de la distribution (ex: "debian", "ubuntu")
+OS_VERSION      # Version de la distribution (ex: "13", "24.04")
+OS_CODENAME     # Nom de code (ex: "trixie", "bookworm", "noble")
+OS_PRETTY_NAME  # Nom complet (ex: "Debian GNU/Linux 13 (trixie)")
+```
+
+Ces variables sont :
+1. Détectées depuis `/etc/os-release`
+2. Sauvegardées dans `.launcher_config`
+3. Exportées avant chaque exécution de script
+4. Disponibles pour tous les scripts via les variables d'environnement
 
 **Architecture** - Téléchargement à la demande:
 1. Affiche les scripts locaux (setup_debian_vm.sh, install_docker.sh)
@@ -189,6 +209,13 @@ Fail2Ban: maxretry=6, bantime=3600  # Intrusion prevention
 ---
 
 ## 🔄 Development Workflows
+
+**IMPORTANT**: Voir `BONNES_PRATIQUES.md` pour les standards complets de développement incluant :
+- Variables OS disponibles ($OS_ID, $OS_VERSION, $OS_CODENAME)
+- Gestion des erreurs
+- Fonctions d'affichage standardisées
+- Sécurité et permissions
+- Checklist complète avant commit
 
 ### Workflow 1: Adding a New Script
 
@@ -715,6 +742,7 @@ fail2ban-client -v start
 - `README.md`: User-facing documentation (French)
 - `SETUP_GUIDE.md`: GitHub repository setup instructions
 - `INSTRUCTIONS.md`: Quick deployment guide
+- `BONNES_PRATIQUES.md`: **Best practices for script development** (Variables OS, standards, checklist)
 
 ### External References
 - [Debian Security Manual](https://www.debian.org/doc/manuals/securing-debian-manual/)
