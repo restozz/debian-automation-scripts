@@ -52,10 +52,22 @@ Le launcher télécharge automatiquement les scripts depuis GitHub **uniquement 
 - ✅ Pas besoin de cloner tout le dépôt
 - ✅ Scripts toujours à jour
 - ✅ Économie d'espace disque
+- ✅ **Support des dépôts privés** avec authentification automatique
+
+### 🔒 Dépôts privés
+
+Le launcher détecte automatiquement si votre dépôt est privé et vous demande un Personal Access Token :
+
+1. Créer un token sur GitHub :
+   - Settings → Developer settings → Personal access tokens
+   - Generate new token (classic)
+   - Permissions : **repo** (full control)
+2. Entrer le token dans le launcher
+3. Le token est stocké en sécurité (permissions 600)
 
 ## 👤 Auteur
 
-Felix - Administrateur Système et Réseaux
+Eloïd DOPPEL - Administrateur Système et Réseaux
 - Infrastructure multi-site (UniFi SD-WAN)
 - Formateur BTS CIEL
 - DoppelServices

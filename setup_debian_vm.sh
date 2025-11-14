@@ -3,7 +3,7 @@
 
 ################################################################################
 # Script de configuration post-installation Debian 13
-# Auteur: Felix
+# Auteur: Eloïd DOPPEL
 # Description: Automatise la mise à jour système et la configuration SSH sécurisée
 ################################################################################
 

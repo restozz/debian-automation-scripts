@@ -3,7 +3,7 @@
 **Repository**: debian-automation-scripts
 **Language**: French (scripts and documentation)
 **Purpose**: System automation scripts for Debian infrastructure with launcher-based deployment
-**Author**: Felix (DoppelServices)
+**Author**: Eloïd DOPPEL (DoppelServices)
 **License**: BSD 2-Clause (see LICENSE)
 
 ---
@@ -113,6 +113,11 @@ check_root() → check_curl() → load_config() → main_loop()
 - Utilise l'API GitHub pour lister les fichiers
 - Télécharge via raw.githubusercontent.com
 - Supporte les branches `main` et `master`
+- **Authentification automatique** pour dépôts privés :
+  - Détecte si le dépôt est privé
+  - Demande un Personal Access Token (PAT)
+  - Token stocké de manière sécurisée (chmod 600)
+  - Utilisé pour toutes les requêtes API et téléchargements
 
 **Menu System**: Uses whiptail for TUI with 22x78 character window
 
@@ -121,6 +126,19 @@ check_root() → check_curl() → load_config() → main_loop()
 - Scripts toujours à jour (téléchargés à chaque exécution)
 - Économie d'espace disque
 - Pas de gestion de git pull
+
+**Configuration dépôt privé**:
+
+Pour utiliser un dépôt GitHub privé, vous devez créer un Personal Access Token :
+
+1. GitHub → Settings → Developer settings
+2. Personal access tokens → Tokens (classic)
+3. Generate new token (classic)
+4. Sélectionner les permissions : **repo** (Full control of private repositories)
+5. Copier le token généré
+6. Le fournir au launcher lors de la configuration
+
+Le token est stocké dans `.launcher_config` avec permissions 600 (lecture/écriture propriétaire uniquement).
 
 ### 2. setup_debian_vm.sh (Security Hardening)
 
@@ -262,7 +280,7 @@ print_warning() { echo -e "${YELLOW}[⚠]${NC} $1"; } # Warning
 ```bash
 ################################################################################
 # Script Name / Purpose
-# Auteur: Felix
+# Auteur: Eloïd DOPPEL
 # Description: Detailed description
 ################################################################################
 ```
@@ -753,7 +771,7 @@ fail2ban-client -v start
 ## 📞 Support & Contact
 
 **Repository Owner**: ResTozz
-**Author**: Felix - Administrateur Système et Réseaux
+**Author**: Eloïd DOPPEL - Administrateur Système et Réseaux
 **Organization**: DoppelServices
 **Infrastructure Context**: Multi-site (UniFi SD-WAN), BTS CIEL training
 

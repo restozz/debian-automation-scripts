@@ -2,7 +2,7 @@
 
 ################################################################################
 # Script Launcher - Hub centralisé pour scripts système
-# Auteur: Felix
+# Auteur: Eloïd DOPPEL
 # Description: Télécharge et exécute les scripts à la demande depuis GitHub
 ################################################################################
 
@@ -59,8 +59,11 @@ GITHUB_REPO="$GITHUB_REPO"
 GITHUB_USER="$GITHUB_USER"
 GITHUB_REPO_NAME="$GITHUB_REPO_NAME"
 GITHUB_BRANCH="$GITHUB_BRANCH"
+GITHUB_TOKEN="$GITHUB_TOKEN"
 LAST_UPDATE=$(date +%s)
 EOF
+    # Sécuriser le fichier de config (contient potentiellement un token)
+    chmod 600 "$CONFIG_FILE"
 }
 
 # Configuration initiale du dépôt GitHub
@@ -86,24 +89,62 @@ setup_github_repo() {
         return 1
     fi
 
-    # Test de connexion au dépôt
+    # Test de connexion au dépôt (sans authentification)
     echo -e "${BLUE}[→]${NC} Vérification du dépôt..."
     local test_url="https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO_NAME"
+    local curl_header=""
+
+    # Essayer sans token d'abord (dépôt public)
     if curl -s -f "$test_url" > /dev/null 2>&1; then
+        GITHUB_TOKEN=""
         save_config
-        echo -e "${GREEN}[✓]${NC} Dépôt configuré avec succès"
+        echo -e "${GREEN}[✓]${NC} Dépôt public configuré avec succès"
+        sleep 2
+        return 0
+    fi
+
+    # Essayer avec branche master pour dépôt public
+    GITHUB_BRANCH="master"
+    if curl -s -f "$test_url" > /dev/null 2>&1; then
+        GITHUB_TOKEN=""
+        save_config
+        echo -e "${GREEN}[✓]${NC} Dépôt public configuré avec succès"
+        sleep 2
+        return 0
+    fi
+
+    # Le dépôt n'est pas accessible publiquement, demander un token
+    echo -e "${YELLOW}[⚠]${NC} Dépôt privé détecté"
+    sleep 1
+
+    local github_token
+    github_token=$(whiptail --passwordbox "Token GitHub requis (Personal Access Token):\n\nPour créer un token:\n1. GitHub → Settings → Developer settings\n2. Personal access tokens → Tokens (classic)\n3. Generate new token\n4. Permissions: repo (full control)" 16 70 "${GITHUB_TOKEN}" 3>&1 1>&2 2>&3)
+
+    if [ -z "$github_token" ]; then
+        echo -e "${RED}[✗]${NC} Token requis pour dépôt privé"
+        sleep 2
+        return 1
+    fi
+
+    GITHUB_TOKEN="$github_token"
+    GITHUB_BRANCH="main"
+
+    # Test avec authentification
+    if curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$test_url" > /dev/null 2>&1; then
+        save_config
+        echo -e "${GREEN}[✓]${NC} Dépôt privé configuré avec succès"
         sleep 2
         return 0
     else
         # Essayer avec la branche master
         GITHUB_BRANCH="master"
-        if curl -s -f "$test_url" > /dev/null 2>&1; then
+        if curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$test_url" > /dev/null 2>&1; then
             save_config
-            echo -e "${GREEN}[✓]${NC} Dépôt configuré avec succès"
+            echo -e "${GREEN}[✓]${NC} Dépôt privé configuré avec succès"
             sleep 2
             return 0
         else
-            echo -e "${RED}[✗]${NC} Impossible d'accéder au dépôt"
+            echo -e "${RED}[✗]${NC} Token invalide ou dépôt inaccessible"
             sleep 2
             return 1
         fi
@@ -119,8 +160,12 @@ list_github_scripts() {
     # URL de l'API GitHub pour lister les fichiers
     local api_url="https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO_NAME/contents"
 
-    # Récupérer la liste des fichiers .sh
-    GITHUB_SCRIPTS=$(curl -s "$api_url" | grep -o '"name": "[^"]*\.sh"' | sed 's/"name": "\(.*\)"/\1/' || echo "")
+    # Récupérer la liste des fichiers .sh avec authentification si nécessaire
+    if [ -n "$GITHUB_TOKEN" ]; then
+        GITHUB_SCRIPTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | grep -o '"name": "[^"]*\.sh"' | sed 's/"name": "\(.*\)"/\1/' || echo "")
+    else
+        GITHUB_SCRIPTS=$(curl -s "$api_url" | grep -o '"name": "[^"]*\.sh"' | sed 's/"name": "\(.*\)"/\1/' || echo "")
+    fi
 }
 
 # Télécharger un script depuis GitHub
@@ -132,13 +177,26 @@ download_script() {
     mkdir -p "$TEMP_DIR"
 
     echo -e "${BLUE}[→]${NC} Téléchargement de $script_name..."
-    if curl -s -f "$download_url" -o "$temp_file" 2>/dev/null; then
-        chmod +x "$temp_file"
-        echo -e "${GREEN}[✓]${NC} Script téléchargé"
-        return 0
+
+    # Télécharger avec authentification si token disponible
+    if [ -n "$GITHUB_TOKEN" ]; then
+        if curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$download_url" -o "$temp_file" 2>/dev/null; then
+            chmod +x "$temp_file"
+            echo -e "${GREEN}[✓]${NC} Script téléchargé"
+            return 0
+        else
+            echo -e "${RED}[✗]${NC} Échec du téléchargement"
+            return 1
+        fi
     else
-        echo -e "${RED}[✗]${NC} Échec du téléchargement"
-        return 1
+        if curl -s -f "$download_url" -o "$temp_file" 2>/dev/null; then
+            chmod +x "$temp_file"
+            echo -e "${GREEN}[✓]${NC} Script téléchargé"
+            return 0
+        else
+            echo -e "${RED}[✗]${NC} Échec du téléchargement"
+            return 1
+        fi
     fi
 }
 
@@ -148,7 +206,12 @@ get_script_description() {
     local download_url="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO_NAME/$GITHUB_BRANCH/$script_name"
 
     # Télécharger les 5 premières lignes et extraire la description
-    local desc=$(curl -s "$download_url" | head -n 5 | grep -m1 "^# Description:" | sed 's/^# Description: //' || echo "Script: $script_name")
+    local desc
+    if [ -n "$GITHUB_TOKEN" ]; then
+        desc=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$download_url" | head -n 5 | grep -m1 "^# Description:" | sed 's/^# Description: //' || echo "Script: $script_name")
+    else
+        desc=$(curl -s "$download_url" | head -n 5 | grep -m1 "^# Description:" | sed 's/^# Description: //' || echo "Script: $script_name")
+    fi
     echo "$desc"
 }
 
