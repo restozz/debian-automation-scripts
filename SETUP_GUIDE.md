@@ -22,7 +22,6 @@ cd debian-automation-scripts
 cp /chemin/vers/README.md .
 cp /chemin/vers/setup_debian_vm.sh .
 cp /chemin/vers/install_docker.sh .
-cp /chemin/vers/setup_monitoring.sh .
 
 # Initialiser git
 git init
@@ -76,24 +75,21 @@ Le launcher clone automatiquement le dépôt et affiche tous vos scripts.
 /root/
 ├── launcher.sh                    # Launcher principal
 ├── setup_debian_vm.sh            # Script Debian (local, toujours dispo)
+├── install_docker.sh             # Script Docker (local, toujours dispo)
 ├── .launcher_config              # Config (créé auto)
-└── scripts/                       # Clone du dépôt GitHub (créé auto)
-    ├── .git/
-    ├── README.md
-    ├── setup_debian_vm.sh
-    ├── install_docker.sh
-    └── setup_monitoring.sh
+└── .temp_scripts/                # Scripts GitHub téléchargés (temporaire)
 ```
 
 ## 🔄 Workflow
 
 1. Développer scripts localement
 2. Push sur GitHub
-3. Sur serveur: `launcher.sh` → U → Scripts à jour
+3. Sur serveur: `launcher.sh` → R (Rafraîchir) → Sélectionner script → Téléchargement automatique
 
 ## 💡 Conseils
 
-- Le script `setup_debian_vm.sh` local reste en position 1
-- Les scripts GitHub sont numérotés à partir de 2
+- Les scripts locaux (setup_debian_vm.sh, install_docker.sh) sont toujours disponibles
+- Les scripts GitHub sont téléchargés uniquement lors de l'exécution
 - Utilisez `# Description:` pour une bonne présentation dans le menu
 - Pensez à `chmod +x` vos scripts avant de commit
+- Le launcher utilise l'API GitHub pour lister les scripts (pas besoin de cloner)

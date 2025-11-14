@@ -11,7 +11,6 @@ Dossier `github-repo/` contient:
 - `SETUP_GUIDE.md` - Guide de mise en place
 - `setup_debian_vm.sh` - Config Debian 13
 - `install_docker.sh` - Installation Docker
-- `setup_monitoring.sh` - Installation Zabbix Agent
 
 ## Actions rapides
 
@@ -45,13 +44,15 @@ Dans le menu:
 
 Menu du launcher:
 ```
-1. Configuration post-installation Debian 13
-2. Installation complète de Docker et Docker Compose  
-3. Installation et configuration Zabbix Agent 6.x
+1. Configuration post-installation Debian 13 (Local)
+2. Installation complète de Docker et Docker Compose (Local)
+[...autres scripts depuis GitHub...]
 
 G. Configurer dépôt GitHub
-U. Mettre à jour depuis GitHub
+R. Rafraîchir la liste des scripts
 Q. Quitter
 ```
+
+**Note**: Les scripts sont téléchargés automatiquement depuis GitHub lors de la sélection.
 
 Tout est prêt à l'emploi ! 🚀

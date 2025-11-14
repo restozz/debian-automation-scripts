@@ -54,29 +54,27 @@ debian-automation-scripts/
 ├── SETUP_GUIDE.md            # Detailed GitHub setup instructions
 ├── CLAUDE.md                 # This file - AI assistant guide
 │
-├── launcher.sh               # Main launcher hub (265 lines)
+├── launcher.sh               # Main launcher hub (322 lines)
 │   ├── Menu system (whiptail)
-│   ├── GitHub repo management
-│   └── Script discovery & execution
+│   ├── GitHub API integration
+│   └── On-demand script download & execution
 │
 └── Automation Scripts:
     ├── setup_debian_vm.sh    # Post-install config (551 lines)
-    ├── install_docker.sh     # Docker installation (73 lines)
-    └── setup_monitoring.sh   # Zabbix agent setup (60 lines)
+    └── install_docker.sh     # Docker installation (73 lines)
 
 Runtime Generated:
-├── .launcher_config          # Generated: Stores GitHub repo URL
-└── scripts/                  # Generated: Git clone of configured repo
+├── .launcher_config          # Generated: Stores GitHub repo configuration
+└── .temp_scripts/            # Generated: Temporary folder for downloaded scripts
 ```
 
 ### File Descriptions
 
 | File | Lines | Purpose | Key Functions |
 |------|-------|---------|---------------|
-| `launcher.sh` | 265 | Main hub | `setup_github_repo()`, `load_scripts()`, `build_menu()` |
+| `launcher.sh` | 322 | Main hub | `setup_github_repo()`, `download_script()`, `list_github_scripts()` |
 | `setup_debian_vm.sh` | 551 | SSH hardening | User setup, SSH config, UFW, Fail2Ban |
 | `install_docker.sh` | 73 | Docker setup | Install Docker CE + Compose |
-| `setup_monitoring.sh` | 60 | Monitoring | Install Zabbix Agent 6.x |
 
 ---
 
@@ -84,31 +82,45 @@ Runtime Generated:
 
 ### 1. launcher.sh (Hub System)
 
-**Purpose**: Central menu system for script management
+**Purpose**: Central menu system for on-demand script download and execution
 
 **Key Components**:
 ```bash
 # Directory structure
 LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_DIR="$LAUNCHER_DIR/scripts"      # Git clone location
+TEMP_DIR="$LAUNCHER_DIR/.temp_scripts"  # Temporary download location
 CONFIG_FILE="$LAUNCHER_DIR/.launcher_config"
 
 # Main workflow
-check_root() → check_whiptail() → load_config() → main_loop()
+check_root() → check_curl() → load_config() → main_loop()
 ```
 
-**Script Discovery Logic** (lines 120-166):
-1. Always includes local `setup_debian_vm.sh` as option #1
-2. Scans `$SCRIPT_DIR/*.sh` for executable scripts
-3. Reads `# Description:` from line 2 of each script
-4. Builds menu dynamically with numbered options
+**Architecture** - Téléchargement à la demande:
+1. Affiche les scripts locaux (setup_debian_vm.sh, install_docker.sh)
+2. Utilise l'API GitHub pour lister les scripts disponibles sur le dépôt
+3. Télécharge le script uniquement quand l'utilisateur le sélectionne
+4. Exécute le script puis le supprime du cache temporaire
+
+**Script Discovery Logic** (lines 156-196):
+1. Scripts locaux toujours disponibles (marqués "Local")
+2. Liste les scripts `.sh` via GitHub API
+3. Récupère la description de chaque script depuis GitHub
+4. Exclut les doublons (scripts déjà présents localement)
 
 **GitHub Integration**:
-- `G` key: Configure/update repository URL
-- `U` key: Pull latest changes from GitHub
-- Supports both `main` and `master` branches
+- `G` key: Configurer l'URL du dépôt GitHub
+- `R` key: Rafraîchir la liste des scripts
+- Utilise l'API GitHub pour lister les fichiers
+- Télécharge via raw.githubusercontent.com
+- Supporte les branches `main` et `master`
 
 **Menu System**: Uses whiptail for TUI with 22x78 character window
+
+**Avantages du téléchargement à la demande**:
+- Pas besoin de cloner tout le dépôt
+- Scripts toujours à jour (téléchargés à chaque exécution)
+- Économie d'espace disque
+- Pas de gestion de git pull
 
 ### 2. setup_debian_vm.sh (Security Hardening)
 
@@ -155,25 +167,6 @@ Fail2Ban: maxretry=6, bantime=3600  # Intrusion prevention
 5. Verify with `docker run --rm hello-world`
 
 **Silent Mode**: Most output redirected to `/dev/null` for clean display
-
-### 4. setup_monitoring.sh (Zabbix Agent)
-
-**Purpose**: Install and configure Zabbix Agent 6.x
-
-**Interactive Prompts**:
-- Zabbix server IP address
-- Hostname for this machine (defaults to `$(hostname)`)
-
-**Configuration File Generated**: `/etc/zabbix/zabbix_agent2.conf`
-```bash
-Server=<IP>
-ServerActive=<IP>
-Hostname=<hostname>
-```
-
-**Packages Installed**:
-- `zabbix-agent2`
-- `zabbix-agent2-plugin-*` (all available plugins)
 
 ---
 
