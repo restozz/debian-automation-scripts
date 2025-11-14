@@ -7,11 +7,13 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_message() { echo -e "${BLUE}[→]${NC} $1"; }
 print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
 print_error() { echo -e "${RED}[✗]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[⚠]${NC} $1"; }
 
 # Vérification root
 if [[ $EUID -ne 0 ]]; then
@@ -19,10 +21,32 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Récupérer les variables OS du launcher (si disponibles)
+if [ -z "$OS_ID" ]; then
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        OS_ID="$ID"
+        OS_VERSION="${VERSION_ID:-unknown}"
+        OS_CODENAME="${VERSION_CODENAME:-unknown}"
+    else
+        print_error "Impossible de détecter le système d'exploitation"
+        exit 1
+    fi
+fi
+
+# Vérifier la compatibilité
+if [[ "$OS_ID" != "debian" ]] && [[ "$OS_ID" != "ubuntu" ]]; then
+    print_error "Ce script supporte uniquement Debian et Ubuntu"
+    print_error "OS détecté: $OS_ID"
+    exit 1
+fi
+
 clear
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║              Installation Docker & Docker Compose              ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+print_message "Système: $OS_ID $OS_VERSION ($OS_CODENAME)"
 echo ""
 
 print_message "Mise à jour du système"
@@ -41,8 +65,8 @@ curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/
 
 print_message "Ajout du dépôt Docker"
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$OS_ID \
+  $OS_CODENAME stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 print_message "Installation de Docker"
 apt-get update -qq
