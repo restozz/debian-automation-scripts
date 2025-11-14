@@ -6,7 +6,8 @@
 # Description: Télécharge et exécute les scripts à la demande depuis GitHub
 ################################################################################
 
-set -e
+# Note: set -e n'est PAS utilisé car c'est un launcher interactif
+# Les erreurs sont gérées manuellement dans chaque fonction
 
 # Couleurs
 RED='\033[0;31m'
@@ -284,7 +285,7 @@ load_scripts() {
         if [ -n "$GITHUB_SCRIPTS" ]; then
             for script_name in $GITHUB_SCRIPTS; do
                 # Ignorer les scripts déjà présents localement
-                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ]; then
+                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ] && [ "$script_name" != "install_proxmox_agent.sh" ]; then
                     local desc=$(get_script_description "$script_name")
                     SCRIPTS[$index]="github:$script_name"
                     DESCRIPTIONS[$index]="$desc (GitHub)"
@@ -398,7 +399,7 @@ main() {
     # Vérifier si le dépôt est configuré au premier lancement
     if [ -z "$GITHUB_REPO" ]; then
         if whiptail --title "Configuration initiale" --yesno "Aucun dépôt GitHub configuré.\n\nVoulez-vous configurer un dépôt maintenant?" 10 60; then
-            setup_github_repo
+            setup_github_repo || true  # Continue même si l'utilisateur annule
         fi
     fi
 
@@ -416,7 +417,7 @@ main() {
                 ;;
             G|g)
                 clear
-                setup_github_repo
+                setup_github_repo || true  # Continue même si l'utilisateur annule
                 ;;
             R|r)
                 clear
