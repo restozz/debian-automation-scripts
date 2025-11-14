@@ -39,8 +39,22 @@ check_root() {
 # Vérification/installation de whiptail
 check_whiptail() {
     if ! command -v whiptail &> /dev/null; then
-        echo "Installation de whiptail..."
-        apt-get update -qq && apt-get install -y whiptail
+        print_message "Installation de whiptail..."
+        if apt-get update -qq && apt-get install -y whiptail; then
+            print_success "Whiptail installé"
+        else
+            print_error "Impossible d'installer whiptail"
+            print_error "Ce launcher nécessite whiptail pour fonctionner"
+            print_message "Installez-le manuellement: apt-get install whiptail"
+            exit 1
+        fi
+    fi
+
+    # Vérifier à nouveau après l'installation
+    if ! command -v whiptail &> /dev/null; then
+        print_error "Whiptail n'est pas disponible"
+        print_message "Installez whiptail manuellement: apt-get install whiptail"
+        exit 1
     fi
 }
 
@@ -317,14 +331,20 @@ build_menu() {
     menu_items+=("R" "Rafraîchir la liste des scripts")
     menu_items+=("Q" "Quitter")
 
-    # Afficher l'info sur le dépôt actuel
+    # Afficher l'info sur le dépôt actuel et le nombre de scripts
     local repo_info=""
     if [ -n "$GITHUB_REPO" ]; then
         repo_info="\n\nDépôt: $GITHUB_USER/$GITHUB_REPO_NAME"
     fi
 
+    # Message si aucun script trouvé
+    local warning_msg=""
+    if [ "$SCRIPT_COUNT" -eq 0 ]; then
+        warning_msg="\n\n⚠ AUCUN SCRIPT DISPONIBLE\nConfigurez un dépôt GitHub (option G) ou ajoutez des scripts locaux."
+    fi
+
     CHOICE=$(whiptail --title "🚀 Script Launcher - Hub Système" \
-        --menu "Sélectionnez un script à exécuter:$repo_info" \
+        --menu "Sélectionnez un script à exécuter:$repo_info$warning_msg" \
         22 78 14 \
         "${menu_items[@]}" \
         3>&1 1>&2 2>&3)

@@ -1,0 +1,15 @@
+# Configuration GitHub
+GITHUB_REPO=""
+GITHUB_USER=""
+GITHUB_REPO_NAME=""
+GITHUB_BRANCH=""
+GITHUB_TOKEN=""
+
+# Détection du système
+OS_ID="ubuntu"
+OS_VERSION="24.04"
+OS_CODENAME="noble"
+OS_PRETTY_NAME="Ubuntu 24.04.3 LTS"
+
+# Métadonnées
+LAST_UPDATE=1763088846
