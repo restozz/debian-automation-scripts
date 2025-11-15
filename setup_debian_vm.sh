@@ -98,6 +98,26 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Marqueur d'exécution
+MARKER_DIR="/root/.debian-scripts"
+MARKER_FILE="$MARKER_DIR/.debian_setup_installed"
+
+# Vérifier si le script a déjà été exécuté
+if [ -f "$MARKER_FILE" ]; then
+    LAST_RUN=$(cat "$MARKER_FILE")
+    echo ""
+    echo -e "${YELLOW}⚠ ATTENTION${NC}"
+    echo "Ce script a déjà été exécuté avec succès le: $LAST_RUN"
+    echo ""
+    read -p "Voulez-vous vraiment le relancer ? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation annulée."
+        exit 0
+    fi
+    echo ""
+fi
+
 print_debug "Date: $(date), Utilisateur: $SUDO_USER, Système: $(uname -a)"
 print_debug "OS: $OS_ID $OS_VERSION ($OS_CODENAME) - $OS_PRETTY_NAME"
 
@@ -568,4 +588,9 @@ echo "  User: $USERNAME"
 echo ""
 echo "Système: $(lsb_release -ds) | Kernel: $(uname -r)"
 print_debug "Script terminé - $(date)"
+
+# Créer le marqueur d'exécution réussie
+mkdir -p "$MARKER_DIR"
+date '+%Y-%m-%d %H:%M:%S' > "$MARKER_FILE"
+
 echo ""

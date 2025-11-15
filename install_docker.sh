@@ -41,6 +41,26 @@ if [[ "$OS_ID" != "debian" ]] && [[ "$OS_ID" != "ubuntu" ]]; then
     exit 1
 fi
 
+# Marqueur d'exécution
+MARKER_DIR="/root/.debian-scripts"
+MARKER_FILE="$MARKER_DIR/.docker_installed"
+
+# Vérifier si le script a déjà été exécuté
+if [ -f "$MARKER_FILE" ]; then
+    LAST_RUN=$(cat "$MARKER_FILE")
+    echo ""
+    echo -e "${YELLOW}⚠ ATTENTION${NC}"
+    echo "Ce script a déjà été exécuté avec succès le: $LAST_RUN"
+    echo ""
+    read -p "Voulez-vous vraiment le relancer ? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation annulée."
+        exit 0
+    fi
+    echo ""
+fi
+
 clear
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║              Installation Docker & Docker Compose              ║"
@@ -94,3 +114,7 @@ echo "  docker ps              - Liste des conteneurs actifs"
 echo "  docker compose up -d   - Lancer des services"
 echo "  docker logs <nom>      - Voir les logs"
 echo ""
+
+# Créer le marqueur d'exécution réussie
+mkdir -p "$MARKER_DIR"
+date '+%Y-%m-%d %H:%M:%S' > "$MARKER_FILE"

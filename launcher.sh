@@ -290,17 +290,17 @@ load_scripts() {
         ((index++))
     fi
 
-    # Script 2: Installation Docker (chercher dans le répertoire courant)
-    if [ -f "$WORKING_DIR/install_docker.sh" ]; then
-        SCRIPT_LIST[$index]="local:install_docker.sh"
-        DESC_LIST[$index]="Installation complète de Docker et Docker Compose (Local)"
-        ((index++))
-    fi
-
-    # Script 3: Installation Proxmox Agent (chercher dans le répertoire courant)
+    # Script 2: Installation Proxmox Agent (chercher dans le répertoire courant)
     if [ -f "$WORKING_DIR/install_proxmox_agent.sh" ]; then
         SCRIPT_LIST[$index]="local:install_proxmox_agent.sh"
         DESC_LIST[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
+        ((index++))
+    fi
+
+    # Script 3: Installation Docker (chercher dans le répertoire courant)
+    if [ -f "$WORKING_DIR/install_docker.sh" ]; then
+        SCRIPT_LIST[$index]="local:install_docker.sh"
+        DESC_LIST[$index]="Installation complète de Docker et Docker Compose (Local)"
         ((index++))
     fi
 

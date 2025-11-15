@@ -49,6 +49,26 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Marqueur d'exécution
+MARKER_DIR="/root/.debian-scripts"
+MARKER_FILE="$MARKER_DIR/.proxmox_agent_installed"
+
+# Vérifier si le script a déjà été exécuté
+if [ -f "$MARKER_FILE" ]; then
+    LAST_RUN=$(cat "$MARKER_FILE")
+    echo ""
+    echo -e "${YELLOW}⚠ ATTENTION${NC}"
+    echo "Ce script a déjà été exécuté avec succès le: $LAST_RUN"
+    echo ""
+    read -p "Voulez-vous vraiment le relancer ? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation annulée."
+        exit 0
+    fi
+    echo ""
+fi
+
 # Récupérer les variables OS du launcher (si disponibles)
 if [ -z "$OS_ID" ]; then
     if [ -f /etc/os-release ]; then
@@ -189,9 +209,9 @@ if systemctl start qemu-guest-agent >> "$TEMP_LOG" 2>&1; then
     echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service démarré ✓    "
     print_success "Service qemu-guest-agent actif"
 else
-    echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service activé (démarrage échoué)    "
-    print_warning "Le service ne peut pas démarrer (normal hors VM Proxmox)"
-    print_message "Le service démarrera automatiquement dans une VM Proxmox"
+    echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service activé (nécessite redémarrage)    "
+    print_warning "Le service ne démarre pas (matériel virtuel non détecté)"
+    print_message "Un REDÉMARRAGE de la VM est nécessaire pour activer l'agent"
 fi
 echo ""
 
@@ -203,9 +223,8 @@ print_message "Vérification finale"
 if systemctl is-active --quiet qemu-guest-agent; then
     print_success "QEMU Guest Agent fonctionne correctement"
 else
-    print_error "Le service n'est pas actif"
-    echo "Vérifier les logs: journalctl -u qemu-guest-agent"
-    exit 1
+    print_warning "Service installé mais pas encore actif"
+    print_message "Le service sera actif après redémarrage de la VM"
 fi
 
 # Récapitulatif
@@ -214,18 +233,21 @@ echo "╔═══════════════════════�
 echo "║              ✓ Installation terminée avec succès              ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
-echo -e "${YELLOW}⚠ Configuration Proxmox requise:${NC}"
+echo -e "${YELLOW}📋 ÉTAPES SUIVANTES:${NC}"
 echo ""
-echo -e "${CYAN}Option 1 - Interface Web Proxmox:${NC}"
-echo "  1. Sélectionner la VM"
-echo "  2. Aller dans Options"
-echo "  3. Activer 'QEMU Guest Agent'"
-echo "  4. Cocher la case ✓"
+echo -e "${CYAN}1. Activer l'agent dans Proxmox (si pas déjà fait):${NC}"
 echo ""
-echo -e "${CYAN}Option 2 - Ligne de commande Proxmox:${NC}"
-echo "  qm set <VMID> --agent 1"
+echo "   Option A - Interface Web:"
+echo "     • VM → Options → QEMU Guest Agent → ✓ Activer"
 echo ""
-echo -e "${RED}⚠ IMPORTANT: Redémarrer la VM après configuration${NC}"
+echo "   Option B - Ligne de commande:"
+echo "     • qm set <VMID> --agent 1"
+echo ""
+echo -e "${RED}2. ⚠ REDÉMARRER LA VM (obligatoire):${NC}"
+echo -e "${YELLOW}   reboot${NC}"
+echo ""
+echo -e "${GREEN}3. Après redémarrage, vérifier:${NC}"
+echo "   systemctl status qemu-guest-agent"
 echo ""
 echo "Commandes utiles:"
 echo "  systemctl status qemu-guest-agent   - Vérifier le statut"
@@ -234,3 +256,44 @@ echo ""
 echo "Système: $OS_PRETTY_NAME"
 echo "Log: $TEMP_LOG"
 echo ""
+
+################################################################################
+# Marqueur d'exécution réussie
+################################################################################
+mkdir -p "$MARKER_DIR"
+date '+%Y-%m-%d %H:%M:%S' > "$MARKER_FILE"
+
+################################################################################
+# Proposition de redémarrage
+################################################################################
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${CYAN}Voulez-vous redémarrer la VM maintenant pour activer l'agent ?${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+read -p "Redémarrer maintenant ? (y/N) " -n 1 -r
+echo ""
+echo ""
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${RED}⚠ Redémarrage de la VM dans 5 secondes...${NC}"
+    echo ""
+    sleep 1
+    echo "  5..."
+    sleep 1
+    echo "  4..."
+    sleep 1
+    echo "  3..."
+    sleep 1
+    echo "  2..."
+    sleep 1
+    echo "  1..."
+    sleep 1
+    echo ""
+    echo -e "${GREEN}Redémarrage en cours...${NC}"
+    reboot
+else
+    echo -e "${BLUE}[→]${NC} Redémarrage annulé"
+    echo -e "${YELLOW}N'oubliez pas de redémarrer la VM plus tard avec: ${NC}${RED}reboot${NC}"
+    echo ""
+fi
