@@ -358,6 +358,53 @@ if ! command -v curl &> /dev/null; then
 fi
 ```
 
+### Vérification des exécutions précédentes (marqueurs)
+
+Pour éviter les exécutions multiples accidentelles d'un script d'installation ou de configuration, implémenter un système de marqueurs :
+
+```bash
+# Marqueur d'exécution
+MARKER_DIR="/root/.debian-scripts"
+MARKER_FILE="$MARKER_DIR/.nom_script_installed"
+
+# Vérifier si le script a déjà été exécuté
+if [ -f "$MARKER_FILE" ]; then
+    LAST_RUN=$(cat "$MARKER_FILE")
+    echo ""
+    echo -e "${YELLOW}⚠ ATTENTION${NC}"
+    echo "Ce script a déjà été exécuté avec succès le: $LAST_RUN"
+    echo ""
+    read -p "Voulez-vous vraiment le relancer ? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation annulée."
+        exit 0
+    fi
+    echo ""
+fi
+```
+
+À la fin du script, après une exécution réussie :
+
+```bash
+# Créer le marqueur d'exécution réussie
+mkdir -p "$MARKER_DIR"
+date '+%Y-%m-%d %H:%M:%S' > "$MARKER_FILE"
+```
+
+**Avantages :**
+- ✅ Évite les exécutions accidentelles multiples
+- ✅ Informe l'utilisateur de la dernière exécution
+- ✅ Permet une relance volontaire avec confirmation
+- ✅ Simple à implémenter et maintenir
+
+**Bonnes pratiques :**
+- Utiliser un nom de fichier marqueur explicite (`.nom_script_installed`)
+- Centraliser tous les marqueurs dans `/root/.debian-scripts/`
+- Stocker la date/heure dans le fichier pour traçabilité
+- Ne créer le marqueur qu'après succès complet du script
+- Par défaut (entrée), annuler la relance (comportement sécurisé)
+
 ---
 
 ## ⏱️ Opérations longues et indicateurs de progression
@@ -714,6 +761,51 @@ if [[ ! $REPLY =~ ^[Oo]$ ]]; then
     exit 0
 fi
 ```
+
+### Proposition de redémarrage
+
+Pour les scripts nécessitant un redémarrage système (ex: installation d'agent, kernel, etc.) :
+
+```bash
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${CYAN}Voulez-vous redémarrer la VM maintenant pour activer les changements ?${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+read -p "Redémarrer maintenant ? (y/N) " -n 1 -r
+echo ""
+echo ""
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${RED}⚠ Redémarrage de la VM dans 5 secondes...${NC}"
+    echo ""
+    sleep 1
+    echo "  5..."
+    sleep 1
+    echo "  4..."
+    sleep 1
+    echo "  3..."
+    sleep 1
+    echo "  2..."
+    sleep 1
+    echo "  1..."
+    sleep 1
+    echo ""
+    echo -e "${GREEN}Redémarrage en cours...${NC}"
+    reboot
+else
+    echo -e "${BLUE}[→]${NC} Redémarrage annulé"
+    echo -e "${YELLOW}N'oubliez pas de redémarrer plus tard avec: ${NC}${RED}reboot${NC}"
+    echo ""
+fi
+```
+
+**Bonnes pratiques :**
+- ✅ Par défaut (entrée), NE PAS redémarrer (comportement sécurisé)
+- ✅ Compte à rebours visible de 5 secondes avant reboot
+- ✅ Rappel de la commande si l'utilisateur refuse
+- ✅ Messages clairs avec couleurs (YELLOW pour attention, RED pour action critique)
+- ✅ Utiliser cette approche uniquement si le redémarrage est vraiment nécessaire
 
 ---
 
