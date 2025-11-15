@@ -24,8 +24,8 @@ print_warning() { echo -e "${YELLOW}[⚠]${NC} $1"; }
 print_debug() { [ "${DEBUG:-0}" = "1" ] && echo -e "${BLUE}[DEBUG]${NC} $1" || true; }
 
 # Répertoires et fichiers
-LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMP_DIR="$LAUNCHER_DIR/.temp_scripts"
+LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Où se trouve launcher.sh
+WORKING_DIR="$(pwd)"  # Répertoire courant (où l'utilisateur a lancé le launcher)
 CONFIG_FILE="$LAUNCHER_DIR/.launcher_config"
 
 # Vérification des privilèges root
@@ -222,29 +222,36 @@ list_github_scripts() {
 download_script() {
     local script_name=$1
     local download_url="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO_NAME/$GITHUB_BRANCH/$script_name"
-    local temp_file="$TEMP_DIR/$script_name"
+    local local_file="$WORKING_DIR/$script_name"
 
-    mkdir -p "$TEMP_DIR"
+    # Vérifier si le script existe déjà localement
+    if [ -f "$local_file" ]; then
+        echo -e "${BLUE}[→]${NC} Script $script_name déjà présent localement"
+        chmod +x "$local_file"
+        return 0
+    fi
 
-    echo -e "${BLUE}[→]${NC} Téléchargement de $script_name..."
+    echo -e "${BLUE}[→]${NC} Téléchargement de $script_name depuis GitHub..."
 
     # Télécharger avec authentification si token disponible
     if [ -n "$GITHUB_TOKEN" ]; then
-        if curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$download_url" -o "$temp_file" 2>/dev/null; then
-            chmod +x "$temp_file"
-            echo -e "${GREEN}[✓]${NC} Script téléchargé"
+        if curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$download_url" -o "$local_file" 2>/dev/null; then
+            chmod +x "$local_file"
+            echo -e "${GREEN}[✓]${NC} Script téléchargé dans $WORKING_DIR"
             return 0
         else
             echo -e "${RED}[✗]${NC} Échec du téléchargement"
+            rm -f "$local_file"  # Nettoyer le fichier partiel
             return 1
         fi
     else
-        if curl -s -f "$download_url" -o "$temp_file" 2>/dev/null; then
-            chmod +x "$temp_file"
-            echo -e "${GREEN}[✓]${NC} Script téléchargé"
+        if curl -s -f "$download_url" -o "$local_file" 2>/dev/null; then
+            chmod +x "$local_file"
+            echo -e "${GREEN}[✓]${NC} Script téléchargé dans $WORKING_DIR"
             return 0
         else
             echo -e "${RED}[✗]${NC} Échec du téléchargement"
+            rm -f "$local_file"  # Nettoyer le fichier partiel
             return 1
         fi
     fi
@@ -276,22 +283,22 @@ load_scripts() {
     DESC_LIST=()
     local index=0
 
-    # Script 1: Configuration Debian (toujours présent en local)
-    if [ -f "$LAUNCHER_DIR/setup_debian_vm.sh" ]; then
+    # Script 1: Configuration Debian (chercher dans le répertoire courant)
+    if [ -f "$WORKING_DIR/setup_debian_vm.sh" ]; then
         SCRIPT_LIST[$index]="local:setup_debian_vm.sh"
         DESC_LIST[$index]="Configuration post-installation Debian 13 (Local)"
         ((index++))
     fi
 
-    # Script 2: Installation Docker (toujours présent en local)
-    if [ -f "$LAUNCHER_DIR/install_docker.sh" ]; then
+    # Script 2: Installation Docker (chercher dans le répertoire courant)
+    if [ -f "$WORKING_DIR/install_docker.sh" ]; then
         SCRIPT_LIST[$index]="local:install_docker.sh"
         DESC_LIST[$index]="Installation complète de Docker et Docker Compose (Local)"
         ((index++))
     fi
 
-    # Script 3: Installation Proxmox Agent (toujours présent en local)
-    if [ -f "$LAUNCHER_DIR/install_proxmox_agent.sh" ]; then
+    # Script 3: Installation Proxmox Agent (chercher dans le répertoire courant)
+    if [ -f "$WORKING_DIR/install_proxmox_agent.sh" ]; then
         SCRIPT_LIST[$index]="local:install_proxmox_agent.sh"
         DESC_LIST[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
         ((index++))
@@ -340,7 +347,7 @@ build_menu() {
     # Message si aucun script trouvé
     local warning_msg=""
     if [ "$SCRIPT_COUNT" -eq 0 ]; then
-        warning_msg="\n\n⚠ AUCUN SCRIPT DISPONIBLE\nConfigurez un dépôt GitHub (option G) ou ajoutez des scripts locaux."
+        warning_msg="\n\n⚠ AUCUN SCRIPT DISPONIBLE\n\nConfigurez un dépôt GitHub (option G).\nLes scripts seront téléchargés dans: $WORKING_DIR"
     fi
 
     CHOICE=$(whiptail --title "🚀 Script Launcher - Hub Système" \
@@ -362,12 +369,12 @@ execute_script() {
     local script_path=""
 
     if [ "$script_type" = "local" ]; then
-        # Script local
-        script_path="$LAUNCHER_DIR/$script_name"
+        # Script local (déjà présent dans WORKING_DIR)
+        script_path="$WORKING_DIR/$script_name"
     else
-        # Script GitHub - télécharger d'abord
+        # Script GitHub - télécharger dans WORKING_DIR si pas déjà présent
         if download_script "$script_name"; then
-            script_path="$TEMP_DIR/$script_name"
+            script_path="$WORKING_DIR/$script_name"
         else
             sleep 2
             return 1
@@ -384,22 +391,20 @@ execute_script() {
     clear
     echo -e "${BLUE}[→]${NC} Exécution: ${DESC_LIST[$script_index]}"
     echo -e "${BLUE}[→]${NC} Système: $OS_PRETTY_NAME"
+    echo -e "${BLUE}[→]${NC} Répertoire: $WORKING_DIR"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
 
     # Exporter les variables d'environnement pour le script
     export OS_ID OS_VERSION OS_CODENAME OS_PRETTY_NAME
     export LAUNCHER_DIR
+    export WORKING_DIR
 
     bash "$script_path"
 
-    # Nettoyer le script temporaire si c'était un script GitHub
-    if [ "$script_type" = "github" ]; then
-        rm -f "$script_path"
-    fi
-
     echo ""
     echo "════════════════════════════════════════════════════════════════"
+    echo -e "${GREEN}[✓]${NC} Script conservé dans: $WORKING_DIR/$script_name"
     read -p "Appuyez sur Entrée pour revenir au menu..."
 }
 
@@ -449,8 +454,7 @@ main() {
             Q|q|"")
                 clear
                 echo -e "${GREEN}[✓]${NC} Au revoir!"
-                # Nettoyer le dossier temporaire
-                rm -rf "$TEMP_DIR"
+                echo -e "${BLUE}[→]${NC} Scripts conservés dans: $WORKING_DIR"
                 exit 0
                 ;;
             *)
