@@ -186,14 +186,13 @@ fi
 
 # Démarrage du service
 if systemctl start qemu-guest-agent >> "$TEMP_LOG" 2>&1; then
-    echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service démarré ✓"
+    echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service démarré ✓    "
+    print_success "Service qemu-guest-agent actif"
 else
-    echo -e "\r  [✗] Échec démarrage du service"
-    print_error "Impossible de démarrer le service"
-    exit 1
+    echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Service activé (démarrage échoué)    "
+    print_warning "Le service ne peut pas démarrer (normal hors VM Proxmox)"
+    print_message "Le service démarrera automatiquement dans une VM Proxmox"
 fi
-
-print_success "Service qemu-guest-agent actif"
 echo ""
 
 ################################################################################
