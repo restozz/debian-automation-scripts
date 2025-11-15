@@ -145,6 +145,177 @@ trap 'handle_error ${LINENO}' ERR
 trap cleanup EXIT
 ```
 
+### Messages d'erreur explicites
+
+**IMPORTANT**: Tous les scripts doivent envoyer des messages d'erreur clairs et informatifs.
+
+#### Principes pour les messages d'erreur
+
+1. **Toujours afficher un message d'erreur** avant de quitter
+2. **Être explicite** : expliquer ce qui a échoué
+3. **Être utile** : donner des pistes de résolution
+4. **Utiliser print_error()** pour la cohérence visuelle
+
+#### Exemples de bons messages d'erreur
+
+```bash
+# ❌ MAUVAIS - Message vague
+if ! systemctl start docker; then
+    print_error "Erreur"
+    exit 1
+fi
+
+# ✅ BON - Message explicite avec contexte
+if ! systemctl start docker; then
+    print_error "Échec du démarrage du service Docker"
+    print_message "Vérifiez les logs: journalctl -xe -u docker"
+    exit 1
+fi
+
+# ✅ TRÈS BON - Message avec diagnostic
+if ! systemctl start docker; then
+    print_error "Échec du démarrage du service Docker"
+    print_message "Vérification du statut..."
+    systemctl status docker --no-pager || true
+    print_message "Logs récents:"
+    journalctl -xe -u docker -n 20 --no-pager
+    exit 1
+fi
+```
+
+#### Messages d'erreur avec action corrective
+
+```bash
+# Vérifier une commande avec solution
+if ! command -v git &> /dev/null; then
+    print_error "Git n'est pas installé"
+    print_message "Pour installer: apt-get install git"
+    exit 1
+fi
+
+# Vérifier un fichier avec explication
+if [ ! -f "/etc/ssh/sshd_config" ]; then
+    print_error "Fichier de configuration SSH introuvable"
+    print_message "OpenSSH Server semble ne pas être installé"
+    print_message "Installation: apt-get install openssh-server"
+    exit 1
+fi
+
+# Vérifier une permission avec solution
+if [ ! -w "/etc/hosts" ]; then
+    print_error "Impossible d'écrire dans /etc/hosts"
+    print_message "Ce script nécessite les privilèges root"
+    print_message "Relancez avec: sudo $0"
+    exit 1
+fi
+```
+
+#### Messages d'erreur pour échecs réseau
+
+```bash
+# Test de connectivité avec message explicite
+if ! curl -s -f "https://api.github.com" > /dev/null 2>&1; then
+    print_error "Impossible de contacter api.github.com"
+    print_warning "Vérifiez votre connexion Internet"
+    print_message "Test: ping -c 3 8.8.8.8"
+    exit 1
+fi
+
+# Téléchargement avec gestion d'erreur
+if ! curl -sSL "https://example.com/file.tar.gz" -o /tmp/file.tar.gz; then
+    print_error "Échec du téléchargement de file.tar.gz"
+    print_message "URL: https://example.com/file.tar.gz"
+    print_message "Vérifiez que l'URL est accessible"
+    rm -f /tmp/file.tar.gz  # Nettoyer le fichier partiel
+    exit 1
+fi
+```
+
+#### Messages d'erreur pour validation de saisie utilisateur
+
+```bash
+# Validation d'une adresse IP
+if ! [[ "$ip_address" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    print_error "Format d'adresse IP invalide: $ip_address"
+    print_message "Format attendu: xxx.xxx.xxx.xxx (ex: 192.168.1.10)"
+    exit 1
+fi
+
+# Validation d'un port
+if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    print_error "Numéro de port invalide: $port"
+    print_message "Le port doit être entre 1 et 65535"
+    exit 1
+fi
+
+# Validation d'un chemin
+if [ ! -d "$directory" ]; then
+    print_error "Le répertoire n'existe pas: $directory"
+    print_message "Créez-le avec: mkdir -p $directory"
+    exit 1
+fi
+```
+
+#### Messages d'erreur avec code de sortie spécifique
+
+```bash
+# Utiliser des codes de sortie différents pour différents types d'erreur
+# 1: Erreur générale
+# 2: Mauvaise utilisation (arguments invalides)
+# 3: Permissions insuffisantes
+# 4: Dépendance manquante
+# 5: Erreur réseau
+
+# Exemple:
+if [[ $EUID -ne 0 ]]; then
+    print_error "Privilèges root requis"
+    exit 3  # Code 3 = permissions
+fi
+
+if ! command -v docker &> /dev/null; then
+    print_error "Docker n'est pas installé"
+    exit 4  # Code 4 = dépendance manquante
+fi
+
+if ! curl -s -f "https://download.docker.com" > /dev/null 2>&1; then
+    print_error "Impossible de contacter download.docker.com"
+    exit 5  # Code 5 = erreur réseau
+fi
+```
+
+#### Template de fonction d'erreur avancée
+
+```bash
+# Fonction d'erreur avec logging et nettoyage
+error_exit() {
+    local message=$1
+    local exit_code=${2:-1}
+    local log_file=${3:-""}
+
+    print_error "$message"
+
+    # Logger dans un fichier si spécifié
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERREUR: $message" >> "$log_file"
+    fi
+
+    # Afficher les logs de debug si disponibles
+    if [ -f "/tmp/script_debug.log" ]; then
+        print_message "Logs de debug disponibles: /tmp/script_debug.log"
+    fi
+
+    # Nettoyage
+    cleanup_on_error
+
+    exit "$exit_code"
+}
+
+# Utilisation:
+if ! systemctl start nginx; then
+    error_exit "Échec du démarrage de Nginx" 1 "/var/log/setup.log"
+fi
+```
+
 ---
 
 ## ✅ Vérifications préalables

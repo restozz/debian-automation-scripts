@@ -6,7 +6,8 @@
 # Description: Télécharge et exécute les scripts à la demande depuis GitHub
 ################################################################################
 
-set -e
+# Note: set -e n'est PAS utilisé car c'est un launcher interactif
+# Les erreurs sont gérées manuellement dans chaque fonction
 
 # Couleurs
 RED='\033[0;31m'
@@ -38,8 +39,22 @@ check_root() {
 # Vérification/installation de whiptail
 check_whiptail() {
     if ! command -v whiptail &> /dev/null; then
-        echo "Installation de whiptail..."
-        apt-get update -qq && apt-get install -y whiptail
+        print_message "Installation de whiptail..."
+        if apt-get update -qq && apt-get install -y whiptail; then
+            print_success "Whiptail installé"
+        else
+            print_error "Impossible d'installer whiptail"
+            print_error "Ce launcher nécessite whiptail pour fonctionner"
+            print_message "Installez-le manuellement: apt-get install whiptail"
+            exit 1
+        fi
+    fi
+
+    # Vérifier à nouveau après l'installation
+    if ! command -v whiptail &> /dev/null; then
+        print_error "Whiptail n'est pas disponible"
+        print_message "Installez whiptail manuellement: apt-get install whiptail"
+        exit 1
     fi
 }
 
@@ -250,30 +265,35 @@ get_script_description() {
     echo "$desc"
 }
 
+# Variables globales pour les scripts
+declare -a SCRIPT_LIST
+declare -a DESC_LIST
+SCRIPT_COUNT=0
+
 # Fonction pour charger les scripts disponibles
 load_scripts() {
-    declare -a SCRIPTS
-    declare -a DESCRIPTIONS
+    SCRIPT_LIST=()
+    DESC_LIST=()
     local index=0
 
     # Script 1: Configuration Debian (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/setup_debian_vm.sh" ]; then
-        SCRIPTS[$index]="local:setup_debian_vm.sh"
-        DESCRIPTIONS[$index]="Configuration post-installation Debian 13 (Local)"
+        SCRIPT_LIST[$index]="local:setup_debian_vm.sh"
+        DESC_LIST[$index]="Configuration post-installation Debian 13 (Local)"
         ((index++))
     fi
 
     # Script 2: Installation Docker (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/install_docker.sh" ]; then
-        SCRIPTS[$index]="local:install_docker.sh"
-        DESCRIPTIONS[$index]="Installation complète de Docker et Docker Compose (Local)"
+        SCRIPT_LIST[$index]="local:install_docker.sh"
+        DESC_LIST[$index]="Installation complète de Docker et Docker Compose (Local)"
         ((index++))
     fi
 
     # Script 3: Installation Proxmox Agent (toujours présent en local)
     if [ -f "$LAUNCHER_DIR/install_proxmox_agent.sh" ]; then
-        SCRIPTS[$index]="local:install_proxmox_agent.sh"
-        DESCRIPTIONS[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
+        SCRIPT_LIST[$index]="local:install_proxmox_agent.sh"
+        DESC_LIST[$index]="Installation QEMU Guest Agent pour Proxmox VE (Local)"
         ((index++))
     fi
 
@@ -283,21 +303,18 @@ load_scripts() {
 
         if [ -n "$GITHUB_SCRIPTS" ]; then
             for script_name in $GITHUB_SCRIPTS; do
-                # Ignorer les scripts déjà présents localement
-                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ]; then
+                # Ignorer les scripts déjà présents localement et launcher.sh lui-même
+                if [ "$script_name" != "setup_debian_vm.sh" ] && [ "$script_name" != "install_docker.sh" ] && [ "$script_name" != "install_proxmox_agent.sh" ] && [ "$script_name" != "launcher.sh" ]; then
                     local desc=$(get_script_description "$script_name")
-                    SCRIPTS[$index]="github:$script_name"
-                    DESCRIPTIONS[$index]="$desc (GitHub)"
+                    SCRIPT_LIST[$index]="github:$script_name"
+                    DESC_LIST[$index]="$desc (GitHub)"
                     ((index++))
                 fi
             done
         fi
     fi
 
-    # Retourner les arrays
-    export SCRIPT_LIST=("${SCRIPTS[@]}")
-    export DESC_LIST=("${DESCRIPTIONS[@]}")
-    export SCRIPT_COUNT=${#SCRIPTS[@]}
+    SCRIPT_COUNT=${#SCRIPT_LIST[@]}
 }
 
 # Construire le menu whiptail
@@ -314,14 +331,20 @@ build_menu() {
     menu_items+=("R" "Rafraîchir la liste des scripts")
     menu_items+=("Q" "Quitter")
 
-    # Afficher l'info sur le dépôt actuel
+    # Afficher l'info sur le dépôt actuel et le nombre de scripts
     local repo_info=""
     if [ -n "$GITHUB_REPO" ]; then
         repo_info="\n\nDépôt: $GITHUB_USER/$GITHUB_REPO_NAME"
     fi
 
+    # Message si aucun script trouvé
+    local warning_msg=""
+    if [ "$SCRIPT_COUNT" -eq 0 ]; then
+        warning_msg="\n\n⚠ AUCUN SCRIPT DISPONIBLE\nConfigurez un dépôt GitHub (option G) ou ajoutez des scripts locaux."
+    fi
+
     CHOICE=$(whiptail --title "🚀 Script Launcher - Hub Système" \
-        --menu "Sélectionnez un script à exécuter:$repo_info" \
+        --menu "Sélectionnez un script à exécuter:$repo_info$warning_msg" \
         22 78 14 \
         "${menu_items[@]}" \
         3>&1 1>&2 2>&3)
@@ -398,7 +421,7 @@ main() {
     # Vérifier si le dépôt est configuré au premier lancement
     if [ -z "$GITHUB_REPO" ]; then
         if whiptail --title "Configuration initiale" --yesno "Aucun dépôt GitHub configuré.\n\nVoulez-vous configurer un dépôt maintenant?" 10 60; then
-            setup_github_repo
+            setup_github_repo || true  # Continue même si l'utilisateur annule
         fi
     fi
 
@@ -416,7 +439,7 @@ main() {
                 ;;
             G|g)
                 clear
-                setup_github_repo
+                setup_github_repo || true  # Continue même si l'utilisateur annule
                 ;;
             R|r)
                 clear
