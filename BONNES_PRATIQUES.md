@@ -358,6 +358,311 @@ if ! command -v curl &> /dev/null; then
 fi
 ```
 
+### Vérification des exécutions précédentes (marqueurs)
+
+Pour éviter les exécutions multiples accidentelles d'un script d'installation ou de configuration, implémenter un système de marqueurs :
+
+```bash
+# Marqueur d'exécution
+MARKER_DIR="/root/.debian-scripts"
+MARKER_FILE="$MARKER_DIR/.nom_script_installed"
+
+# Vérifier si le script a déjà été exécuté
+if [ -f "$MARKER_FILE" ]; then
+    LAST_RUN=$(cat "$MARKER_FILE")
+    echo ""
+    echo -e "${YELLOW}⚠ ATTENTION${NC}"
+    echo "Ce script a déjà été exécuté avec succès le: $LAST_RUN"
+    echo ""
+    read -p "Voulez-vous vraiment le relancer ? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation annulée."
+        exit 0
+    fi
+    echo ""
+fi
+```
+
+À la fin du script, après une exécution réussie :
+
+```bash
+# Créer le marqueur d'exécution réussie
+mkdir -p "$MARKER_DIR"
+date '+%Y-%m-%d %H:%M:%S' > "$MARKER_FILE"
+```
+
+**Avantages :**
+- ✅ Évite les exécutions accidentelles multiples
+- ✅ Informe l'utilisateur de la dernière exécution
+- ✅ Permet une relance volontaire avec confirmation
+- ✅ Simple à implémenter et maintenir
+
+**Bonnes pratiques :**
+- Utiliser un nom de fichier marqueur explicite (`.nom_script_installed`)
+- Centraliser tous les marqueurs dans `/root/.debian-scripts/`
+- Stocker la date/heure dans le fichier pour traçabilité
+- Ne créer le marqueur qu'après succès complet du script
+- Par défaut (entrée), annuler la relance (comportement sécurisé)
+
+---
+
+## ⏱️ Opérations longues et indicateurs de progression
+
+### Principe : Toujours montrer que le script travaille
+
+**IMPORTANT** : Pour toute opération qui prend plus de 5 secondes, afficher un indicateur de progression pour rassurer l'utilisateur que le script n'est pas planté.
+
+###  Barre de progression simple
+
+```bash
+# Barre de progression avec pourcentage
+print_message "Installation des paquets..."
+
+echo -n "  [          ] 0%"
+# Opération 1
+sleep 2
+echo -e "\r  [▓▓        ] 20%"
+
+# Opération 2
+sleep 2
+echo -e "\r  [▓▓▓▓      ] 40%"
+
+# Opération 3
+sleep 2
+echo -e "\r  [▓▓▓▓▓▓    ] 60%"
+
+# Opération 4
+sleep 2
+echo -e "\r  [▓▓▓▓▓▓▓▓  ] 80%"
+
+# Opération 5
+sleep 2
+echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% ✓"
+echo ""
+```
+
+### Spinner animé pour opérations de durée indéterminée
+
+```bash
+# Fonction spinner
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while ps -p $pid > /dev/null 2>&1; do
+        local temp=${spinstr#?}
+        printf " [%c] En cours..." "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\r"
+    done
+    printf "    \r"
+}
+
+# Utilisation
+(
+    # Opération longue en arrière-plan
+    apt-get update -qq && apt-get upgrade -y > /dev/null 2>&1
+) &
+spinner $!
+print_success "Mise à jour terminée"
+```
+
+### Indicateur de vie toutes les 5 secondes
+
+**CRITIQUE** : Pour les opérations très longues (> 30 secondes), afficher un signe de vie toutes les 5 secondes.
+
+```bash
+# Pattern pour opérations longues avec feedback régulier
+long_operation() {
+    local log_file="/tmp/operation.log"
+
+    # Lancer l'opération en arrière-plan
+    (
+        apt-get update >> "$log_file" 2>&1
+        apt-get dist-upgrade -y >> "$log_file" 2>&1
+    ) &
+    local pid=$!
+
+    # Afficher un point toutes les 5 secondes
+    echo -n "  [→] Opération en cours"
+    while ps -p $pid > /dev/null 2>&1; do
+        sleep 5
+        echo -n "."
+    done
+    echo " ✓"
+
+    # Attendre la fin
+    wait $pid
+    return $?
+}
+
+# Utilisation
+print_message "Mise à jour système (peut prendre plusieurs minutes)..."
+if long_operation; then
+    print_success "Mise à jour terminée"
+else
+    print_error "Échec de la mise à jour"
+    exit 1
+fi
+```
+
+### Progress bar avec estimation de temps
+
+```bash
+# Barre de progression avec timer
+progress_bar() {
+    local duration=$1
+    local steps=10
+    local step_duration=$((duration / steps))
+
+    echo -n "  ["
+    for ((i=0; i<steps; i++)); do
+        echo -n " "
+    done
+    echo -n "] 0%"
+
+    for ((i=1; i<=steps; i++)); do
+        sleep $step_duration
+        local percent=$((i * 100 / steps))
+        local filled=$(printf '▓%.0s' $(seq 1 $i))
+        local empty=$(printf ' %.0s' $(seq $((i+1)) $steps))
+        echo -ne "\r  [$filled$empty] $percent%"
+    done
+    echo " ✓"
+}
+
+# Utilisation
+print_message "Téléchargement des paquets..."
+progress_bar 30  # 30 secondes
+```
+
+### Affichage en temps réel des logs
+
+```bash
+# Afficher les logs en temps réel pour les opérations critiques
+print_message "Compilation en cours (logs en temps réel)..."
+
+{
+    ./configure --prefix=/usr &&
+    make &&
+    make install
+} 2>&1 | while IFS= read -r line; do
+    echo "    $line"
+done
+
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    print_success "Compilation réussie"
+else
+    print_error "Échec de la compilation"
+    exit 1
+fi
+```
+
+### Compteur d'étapes multiples
+
+```bash
+# Pour scripts avec plusieurs étapes importantes
+TOTAL_STEPS=5
+CURRENT_STEP=0
+
+step() {
+    ((CURRENT_STEP++))
+    print_message "[$CURRENT_STEP/$TOTAL_STEPS] $1"
+}
+
+step "Mise à jour des dépôts"
+apt-get update -qq
+
+step "Installation des dépendances"
+apt-get install -y build-essential
+
+step "Téléchargement des sources"
+wget https://example.com/source.tar.gz
+
+step "Compilation"
+tar xzf source.tar.gz && cd source && make
+
+step "Installation"
+make install
+
+print_success "Installation terminée ($TOTAL_STEPS/$TOTAL_STEPS étapes)"
+```
+
+### Timeout avec indicateur visuel
+
+```bash
+# Attendre un service avec timeout et indicateur
+wait_for_service() {
+    local service=$1
+    local timeout=${2:-30}
+    local elapsed=0
+
+    echo -n "  [→] Attente démarrage de $service"
+    while ! systemctl is-active --quiet $service; do
+        if [ $elapsed -ge $timeout ]; then
+            echo " ✗"
+            return 1
+        fi
+        sleep 1
+        echo -n "."
+        ((elapsed++))
+    done
+    echo " ✓"
+    return 0
+}
+
+# Utilisation
+print_message "Démarrage du service Docker..."
+if wait_for_service docker 60; then
+    print_success "Service Docker actif"
+else
+    print_error "Timeout: Le service n'a pas démarré"
+    exit 1
+fi
+```
+
+### Bonnes pratiques pour les indicateurs
+
+1. **Toujours nettoyer la ligne** : Utiliser `\r` pour revenir au début et effacer avec des espaces
+2. **Donner des estimations** : "Peut prendre 2-5 minutes" si durée variable
+3. **Être précis** : Indiquer l'étape en cours ("Téléchargement", "Installation", "Configuration")
+4. **Ne jamais bloquer silencieusement** : Toujours un signe de vie < 10 secondes
+5. **Feedback sur échec** : Afficher les logs pertinents si erreur
+
+**Exemple complet** :
+```bash
+print_message "Installation de Docker (2-3 minutes)..."
+
+echo -n "  [          ] 0% Ajout du dépôt..."
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg
+echo -e "\r  [▓▓        ] 20% Dépôt ajouté ✓     "
+
+echo -n "  [▓▓        ] 20% Mise à jour..."
+apt-get update -qq
+echo -e "\r  [▓▓▓▓      ] 40% Dépôts à jour ✓    "
+
+echo -n "  [▓▓▓▓      ] 40% Téléchargement (peut prendre 1-2 min)"
+apt-get install -y docker-ce docker-ce-cli containerd.io >> /tmp/docker_install.log 2>&1 &
+pid=$!
+
+# Afficher des points toutes les 5 secondes pendant le téléchargement
+while ps -p $pid > /dev/null 2>&1; do
+    sleep 5
+    echo -n "."
+done
+wait $pid
+
+echo -e "\r  [▓▓▓▓▓▓▓▓  ] 80% Paquets installés ✓                                  "
+
+echo -n "  [▓▓▓▓▓▓▓▓  ] 80% Démarrage du service..."
+systemctl enable --now docker
+echo -e "\r  [▓▓▓▓▓▓▓▓▓▓] 100% Installation terminée ✓   "
+
+print_success "Docker installé et actif"
+```
+
 ---
 
 ## 📦 Installation de paquets
@@ -456,6 +761,51 @@ if [[ ! $REPLY =~ ^[Oo]$ ]]; then
     exit 0
 fi
 ```
+
+### Proposition de redémarrage
+
+Pour les scripts nécessitant un redémarrage système (ex: installation d'agent, kernel, etc.) :
+
+```bash
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${CYAN}Voulez-vous redémarrer la VM maintenant pour activer les changements ?${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+read -p "Redémarrer maintenant ? (y/N) " -n 1 -r
+echo ""
+echo ""
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${RED}⚠ Redémarrage de la VM dans 5 secondes...${NC}"
+    echo ""
+    sleep 1
+    echo "  5..."
+    sleep 1
+    echo "  4..."
+    sleep 1
+    echo "  3..."
+    sleep 1
+    echo "  2..."
+    sleep 1
+    echo "  1..."
+    sleep 1
+    echo ""
+    echo -e "${GREEN}Redémarrage en cours...${NC}"
+    reboot
+else
+    echo -e "${BLUE}[→]${NC} Redémarrage annulé"
+    echo -e "${YELLOW}N'oubliez pas de redémarrer plus tard avec: ${NC}${RED}reboot${NC}"
+    echo ""
+fi
+```
+
+**Bonnes pratiques :**
+- ✅ Par défaut (entrée), NE PAS redémarrer (comportement sécurisé)
+- ✅ Compte à rebours visible de 5 secondes avant reboot
+- ✅ Rappel de la commande si l'utilisateur refuse
+- ✅ Messages clairs avec couleurs (YELLOW pour attention, RED pour action critique)
+- ✅ Utiliser cette approche uniquement si le redémarrage est vraiment nécessaire
 
 ---
 

@@ -87,9 +87,6 @@ Consultez **BONNES_PRATIQUES.md** pour :
 ## 👤 Auteur
 
 Eloïd DOPPEL - Administrateur Système et Réseaux
-- Infrastructure multi-site (UniFi SD-WAN)
-- Formateur BTS CIEL
-- DoppelServices
 
 ## 📄 Licence
 
